@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>Travel Map - 自动播放区域涂色</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { width: 100%; height: 100%; }
+    .year-label {
+      position: absolute;
+      top: 20px;
+      right: 40px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 18px;
+      z-index: 999;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="year-label" class="year-label">加载中...</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  async function initMap() {
+    const map = L.map('map').setView([30, 110], 4);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 10,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 载入地理边界数据
+    const geoRes = await fetch('data/getBoundaries-CHN-ADM2.geojson');
+    const geoData = await geoRes.json();
+
+    // 载入地点数据
+    const placeRes = await fetch('data/places.json');
+    const places = await placeRes.json();
+    places.sort((a, b) => (a.year || 0) - (b.year || 0));
+
+    const yearLabel = document.getElementById("year-label");
+    let i = 0;
+
+    function highlightPlace(place) {
+      if (!place) return;
+      yearLabel.textContent = `${place.year || "未知"}`;
+
+      // 飞到大致中心
+      if (place.lat && place.lng)
+        map.flyTo([place.lat, place.lng], 5, { duration: 2 });
+
+      // 如果是区域，去 geojson 里找对应的行政区块
+      if (place.type === "region" && place.code) {
+        const region = geoData.features.find(f =>
+          f.properties.name === place.code || f.properties.NAME === place.code
+        );
+        if (region) {
+          const color = `hsl(${(i * 45) % 360}, 70%, 60%)`;
+          const layer = L.geoJSON(region, {
+            style: {
+              color: "#333",
+              weight: 1,
+              fillColor: color,
+              fillOpacity: 0.5
+            }
+          }).addTo(map);
+          layer.bindPopup(`<b>${place.name}</b>`);
+        } else {
+          console.warn("未找到对应区域：", place.code);
+        }
+      }
+
+      // 如果是点标
+      if (place.type === "point" && place.lat && place.lng) {
+        const marker = L.circleMarker([place.lat, place.lng], {
+          radius: 6,
+          color: "#FF6F61",
+          fillColor: "#FF6F61",
+          fillOpacity: 0.9
+        }).addTo(map);
+        marker.bindPopup(`<b>${place.name}</b><br>${place.note || ""}`);
+      }
+    }
+
+    // 自动播放动画
+    function autoPlay() {
+      if (i >= places.length) {
+        yearLabel.textContent = "播放结束";
+        return;
+      }
+      const place = places[i];
+      highlightPlace(place);
+      i++;
+      setTimeout(autoPlay, 3000);
+    }
+
+    autoPlay();
+  }
+
+  initMap();
+  </script>
+</body>
+</html>
