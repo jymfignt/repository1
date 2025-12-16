@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MO Snake</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="400" height="400"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const CELL = 20;
+
+    const socket = new WebSocket("ws://" + location.host);
+
+    let gameState = null;
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "state") {
+        gameState = data.state;
+      }
+    };
+
+    window.addEventListener("keydown", (e) => {
+      const map = {
+        ArrowUp: "UP",
+        ArrowDown: "DOWN",
+        ArrowLeft: "LEFT",
+        ArrowRight: "RIGHT"
+      };
+      if (map[e.key]) {
+        socket.send(JSON.stringify({
+          type: "input",
+          direction: map[e.key]
+        }));
+      }
+    });
+
+    function draw() {
+      if (!gameState) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // food
+      ctx.fillStyle = "red";
+      ctx.fillRect(
+        gameState.food.x * CELL,
+        gameState.food.y * CELL,
+        CELL,
+        CELL
+      );
+
+      // players
+      for (const id in gameState.players) {
+        const p = gameState.players[id];
+        ctx.fillStyle = "lime";
+        p.body.forEach(seg => {
+          ctx.fillRect(
+            seg.x * CELL,
+            seg.y * CELL,
+            CELL,
+            CELL
+          );
+        });
+      }
+    }
+
+    function loop() {
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
