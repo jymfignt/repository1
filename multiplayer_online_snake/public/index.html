@@ -1,75 +1,482 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <title>MO Snake</title>
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
       background: #111;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #fff;
+    }
+    #menu {
+      text-align: center;
+      padding: 20px;
+    }
+    #menu h1 {
+      margin-bottom: 30px;
+      font-size: 2.5em;
+    }
+    .mode-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 1.2em;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #roomSection {
+      display: none;
+      margin-top: 20px;
+    }
+    #roomSection input {
+      padding: 10px;
+      font-size: 1em;
+      margin-right: 10px;
+      border-radius: 5px;
+      border: 1px solid #333;
+      background: #222;
+      color: #fff;
+    }
+    #roomInfo {
+      margin-top: 20px;
+      padding: 15px;
+      background: #222;
+      border-radius: 5px;
+      display: none;
     }
     canvas {
       background: #000;
+      border: 2px solid #333;
+      display: none;
+    }
+    #score {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 1.2em;
+      display: none;
     }
   </style>
 </head>
 <body>
+  <div id="menu">
+    <h1>贪吃蛇在线游玩</h1>
+    <div class="mode-buttons">
+      <button onclick="selectMode('single')">单人练习</button>
+      <button onclick="selectMode('multi')">多人乱斗</button>
+    </div>
+    <div id="roomSection">
+      <button onclick="createRoom()">创建房间</button>
+      <div style="margin: 20px 0;">
+        <input type="text" id="roomIdInput" placeholder="输入房间ID加入">
+        <button onclick="joinRoom()">加入房间</button>
+      </div>
+      <div id="roomInfo">
+        <p>房间ID: <span id="roomIdDisplay"></span></p>
+        <p>等待其他玩家加入...</p>
+      </div>
+    </div>
+  </div>
+  <div id="score">得分: <span id="scoreValue">0</span></div>
   <canvas id="game" width="400" height="400"></canvas>
-
+  <div id="deathModal" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; text-align: center; border-radius: 10px;">
+    <h2>你挂了！</h2>
+    <p>复活倒计时: <span id="respawnTimer">10</span></p>
+    <!-- 按钮一开始是禁用的 (disabled) -->
+    <button id="respawnBtn" onclick="requestRespawn()" disabled>立即重生</button>
+</div>
   <script>
+    const GRID_SIZE = 20;
+    const CELL = 20;
+    const TICK_RATE = 100;
+    
+    let gameMode = null;
+    let socket = null;
+    let gameState = null;
+    let localGameState = null;
+    let localGameLoop = null;
+    let currentRoomId = null;
+    let myId = null; 
+    let isDead = false; 
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const CELL = 20;
 
-    const socket = new WebSocket("ws://" + location.host);
-
-    let gameState = null;
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "state") {
-        gameState = data.state;
+    // 选择模式
+    function selectMode(mode) {
+      gameMode = mode;
+      if (mode === 'single') {
+        startSinglePlayer();
+      } else {
+        document.getElementById('roomSection').style.display = 'block';
       }
-    };
+    }
 
-    window.addEventListener("keydown", (e) => {
-      const map = {
-        ArrowUp: "UP",
-        ArrowDown: "DOWN",
-        ArrowLeft: "LEFT",
-        ArrowRight: "RIGHT"
+    // 单人模式 - 本地游戏
+    function startSinglePlayer() {
+      document.getElementById('menu').style.display = 'none';
+      document.getElementById('game').style.display = 'block';
+      document.getElementById('score').style.display = 'block';
+      
+      // 初始化本地游戏状态
+      localGameState = {
+        players: {},
+        food: { x: 10, y: 10 }
       };
-      if (map[e.key]) {
+      
+      const playerId = 'player1';
+      localGameState.players[playerId] = {
+        id: playerId,
+        direction: "RIGHT",
+        body: [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }],
+        alive: true,
+        score: 0
+      };
+      
+      respawnFoodLocal();
+      
+      // 启动本地游戏循环
+      if (localGameLoop) clearInterval(localGameLoop);
+      localGameLoop = setInterval(() => {
+        updateLocalGame();
+        draw();
+      }, TICK_RATE);
+      
+      // 键盘控制
+      document.addEventListener("keydown", handleLocalKeyPress);
+    }
+
+    // 本地游戏更新逻辑
+    function updateLocalGame() {
+      const player = localGameState.players['player1'];
+      if (!player || !player.alive) return;
+
+      const head = { ...player.body[0] };
+      let nextHead = { ...head };
+      if (player.direction === "UP") nextHead.y--;
+      if (player.direction === "DOWN") nextHead.y++;
+      if (player.direction === "LEFT") nextHead.x--;
+      if (player.direction === "RIGHT") nextHead.x++;
+     
+      // 碰撞检测 - 边界
+      if (nextHead.x < 0 || nextHead.x >= GRID_SIZE || nextHead.y < 0 || nextHead.y >= GRID_SIZE) {
+        player.alive = false;
+        alert('游戏结束！得分: ' + player.score);
+        resetLocalGame();
+        return;
+      }
+      
+      // 碰撞检测 - 撞自己
+      for (const segment of player.body) {
+        if (segment.x === nextHead.x && segment.y === nextHead.y) {
+          player.alive = false;
+          alert('游戏结束！得分: ' + player.score);
+          resetLocalGame();
+          return;
+        }
+      }
+     
+      player.body.unshift(nextHead);
+      // 检查食物
+      if (head.x === localGameState.food.x && head.y === localGameState.food.y) {
+        respawnFoodLocal();
+        player.score++;
+        document.getElementById('scoreValue').textContent = player.score;
+      } else {
+        player.body.pop();
+      }
+    }
+
+    function resetLocalGame() {
+      localGameState.players['player1'] = {
+        id: 'player1',
+        direction: "RIGHT",
+        body: [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }],
+        alive: true,
+        score: 0
+      };
+      document.getElementById('scoreValue').textContent = '0';
+      respawnFoodLocal();
+    }
+
+    function respawnFoodLocal() {
+      let isPositionValid = false;
+      let newX, newY;
+      let count = 0;
+      
+      while (!isPositionValid && count < 100) {
+        isPositionValid = true;
+        newX = Math.floor(Math.random() * GRID_SIZE);
+        newY = Math.floor(Math.random() * GRID_SIZE);
+        
+        const player = localGameState.players['player1'];
+        for (const segment of player.body) {
+          if (segment.x === newX && segment.y === newY) {
+            isPositionValid = false;
+            break;
+          }
+        }
+        count++;
+      }
+      
+      localGameState.food.x = newX;
+      localGameState.food.y = newY;
+    }
+
+    function handleLocalKeyPress(e) {
+      if (gameMode !== 'single') return;
+      
+      const keyMap = {
+        "ArrowUp": "UP",
+        "w": "UP",
+        "ArrowDown": "DOWN",
+        "s": "DOWN",
+        "ArrowLeft": "LEFT",
+        "a": "LEFT",
+        "ArrowRight": "RIGHT",
+        "d": "RIGHT"
+      };
+      
+      const direction = keyMap[e.key];
+      if (direction) {
+        const player = localGameState.players['player1'];
+        if (!player) return;
+        
+        // 防反向
+        if (player.direction === "UP" && direction === "DOWN") return;
+        if (player.direction === "DOWN" && direction === "UP") return;
+        if (player.direction === "LEFT" && direction === "RIGHT") return;
+        if (player.direction === "RIGHT" && direction === "LEFT") return;
+        
+        player.direction = direction;
+      }
+    }
+
+    // 多人模式 - 创建房间
+    function createRoom() {
+      const wsUrl = `ws://${location.host}?mode=multi`;
+      connectToServer(wsUrl);
+    }
+
+    // 多人模式 - 加入房间
+    function joinRoom() {
+      const roomId = document.getElementById('roomIdInput').value.trim();
+      if (!roomId) {
+        alert('请输入房间ID');
+        return;
+      }
+      const wsUrl = `ws://${location.host}?mode=multi&gameId=${roomId}`;
+      connectToServer(wsUrl);
+    }
+
+    // 连接到服务器
+    function connectToServer(wsUrl) {
+      socket = new WebSocket(wsUrl);
+      
+      socket.onopen = () => {
+        console.log('已连接到服务器');
+      };
+      
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+           // 1. 接收自己的 ID
+           if (data.type === 'init') {
+            myId = data.id;
+            console.log("我的ID是:", myId);
+        }
+        // 2. 房间创建成功
+        else if (data.type === 'roomCreated') {
+          currentRoomId = data.roomId;
+          document.getElementById('roomIdDisplay').textContent = data.roomId;
+          document.getElementById('roomInfo').style.display = 'block';
+          document.getElementById('menu').style.display = 'none';
+          document.getElementById('game').style.display = 'block';
+          document.getElementById('score').style.display = 'block';
+        } 
+        // 3. 游戏状态更新 (核心)
+        else if (data.type === 'state') {
+          gameState = data.state;
+          updateScore();
+          
+          document.getElementById('menu').style.display = 'none';
+          document.getElementById('game').style.display = 'block';
+          document.getElementById('score').style.display = 'block';
+
+          // === 这里加入死亡弹窗检测逻辑 ===
+          if (myId && gameState.players[myId]) {
+              const myPlayer = gameState.players[myId];
+              
+              if (!myPlayer.alive) {
+                  // 如果刚死，且没有弹窗
+                  if (!isDead) {
+                      isDead = true;
+                      showDeathModal();
+                  }
+              } else {
+                  // 如果活了，且弹窗还在
+                  if (isDead) {
+                      isDead = false;
+                      hideDeathModal();
+                  }
+              }
+          }
+        } 
+        else if (data.type === 'error') {
+          alert(data.message);
+        }
+        document.addEventListener("keydown", handleMultiKeyPress);
+      };
+      
+      socket.onerror = (error) => {
+        console.error('WebSocket错误:', error);
+      };
+      
+      socket.onclose = () => {
+        console.log('连接已关闭');
+      };
+      
+      // 键盘控制
+      document.addEventListener("keydown", handleMultiKeyPress);
+    }
+
+    function handleMultiKeyPress(e) {
+      if (gameMode !== 'multi' || !socket || socket.readyState !== WebSocket.OPEN) return;
+      
+      const keyMap = {
+        "ArrowUp": "UP",
+        "w": "UP",
+        "ArrowDown": "DOWN",
+        "s": "DOWN",
+        "ArrowLeft": "LEFT",
+        "a": "LEFT",
+        "ArrowRight": "RIGHT",
+        "d": "RIGHT"
+      };
+      
+      const direction = keyMap[e.key];
+      if (direction) {
         socket.send(JSON.stringify({
           type: "input",
-          direction: map[e.key]
+          direction: direction
         }));
       }
-    });
+    }
 
+    function updateScore() {
+      if (!gameState || !gameState.players) return;
+      let maxScore = 0;
+      for (const id in gameState.players) {
+        if (gameState.players[id].score > maxScore) {
+          maxScore = gameState.players[id].score;
+        }
+      }
+      document.getElementById('scoreValue').textContent = maxScore;
+    }
+    function showDeathModal() {
+        const modal = document.getElementById('deathModal');
+        const timerSpan = document.getElementById('respawnTimer');
+        const btn = document.getElementById('respawnBtn');
+        
+        modal.style.display = 'block';
+        btn.disabled = true; 
+        btn.innerText = "等待复活...";
+
+        let timeLeft = 5; 
+        timerSpan.innerText = timeLeft;
+
+        const timer = setInterval(() => {
+            timeLeft--;
+            timerSpan.innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                btn.disabled = false;
+                btn.innerText = "点击重生";
+            }
+        }, 1000);
+    }
+
+    function hideDeathModal() {
+        document.getElementById('deathModal').style.display = 'none';
+    }
+
+    function requestRespawn() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: "restart" }));
+            const btn = document.getElementById('respawnBtn');
+            btn.disabled = true;
+            btn.innerText = "请求中...";
+        }
+    }
+
+    // 绘制函数
     function draw() {
-      if (!gameState) return;
+      const state = gameMode === 'single' ? localGameState : gameState;
+      if (!state) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // food
+      // 绘制网格
+      ctx.strokeStyle = "#222";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * CELL, 0);
+        ctx.lineTo(i * CELL, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * CELL);
+        ctx.lineTo(canvas.width, i * CELL);
+        ctx.stroke();
+      }
+
+      // 绘制食物
       ctx.fillStyle = "red";
       ctx.fillRect(
-        gameState.food.x * CELL,
-        gameState.food.y * CELL,
+        state.food.x * CELL,
+        state.food.y * CELL,
         CELL,
         CELL
       );
 
-      // players
-      for (const id in gameState.players) {
-        const p = gameState.players[id];
-        ctx.fillStyle = "lime";
-        p.body.forEach(seg => {
+      // 绘制玩家
+      for (const id in state.players) {
+        const p = state.players[id];
+        if (!p.alive) continue;
+        
+        // 不同玩家不同颜色
+        const colors = ["lime", "cyan", "yellow", "magenta", "orange"];
+        const colorIndex = parseInt(id) % colors.length || 0;
+        ctx.fillStyle = colors[colorIndex] || "lime";
+        
+        p.body.forEach((seg, index) => {
+          if (index === 0) {
+            // 蛇头用更亮的颜色
+            ctx.fillStyle = "#fff";
+          } else {
+            ctx.fillStyle = colors[colorIndex] || "lime";
+          }
           ctx.fillRect(
             seg.x * CELL,
             seg.y * CELL,
@@ -80,11 +487,11 @@
       }
     }
 
+    // 启动绘制循环
     function loop() {
       draw();
       requestAnimationFrame(loop);
     }
-
     loop();
   </script>
 </body>
