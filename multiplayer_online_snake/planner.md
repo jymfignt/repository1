@@ -1,75 +1,71 @@
-# Phase 0：准备（10 分钟）
-- [x] 新建项目目录
-- [x]  初始化 Node 项目
-- [x]  安装 WebSocket 库（ws）
-- [x]  确认 Node 版本 ≥ 18
->目标：能 node server.js 跑起来
+# update
+- [x] 修改蛇身长度，使其在走动时灵活可变（头尾变化
+- [x] 键盘上下左右映射到屏幕里（客户端监听键盘发送指令；服务器接受指令修改玩家direction；GameLoop修改坐标）
+- [x] 吃东西头加尾不变（考虑如果贪吃蛇长度很长的情况）
+- [x] 碰撞判断 （边界碰撞；撞自己
+- [x] 多人同时状态 （更新碰撞判断
+- [ ] 何时结束游戏
 
-# Phase 1：后端世界模型（纯逻辑，不连前端）
-1. 定义基础数据结构
-- [x] World（宽、高）
-- [x] Player（id / direction / body / alive）
-- [x] GameState（players / food）
-> 不写 WebSocket 都行，先把模型想清楚
+
 
 2. 玩家加入 / 离开
-- [ ] 新玩家生成初始蛇
-- [ ] 玩家断线清理
+- [x] 新玩家生成初始蛇
+- [x] 玩家断线清理
 - [ ] 不允许出生点重叠（可先忽略）
 
 3. Tick 机制
--[ ] setInterval(gameLoop, 100)
--[ ] 所有蛇按方向前进一格
--[ ] 暂时不检测任何碰撞
+- [x] setInterval(gameLoop, 100)
+- [x] 所有蛇按方向前进一格
+- [x] 暂时不检测任何碰撞
 
 >验收标准：console.log(players) 能看到蛇在“动”
 
 # Phase 2：WebSocket 通信（还是不画画）
 4. 建立 WebSocket 服务
--[ ] 客户端连接
--[ ] 分配 playerId
--[ ] 存进 players Map
+- [x] 客户端连接
+- [x] 分配 playerId
+- [x] 存进 players Map
 
 5. 输入处理
--[ ] 接收 { type: "input", direction }
--[ ] 只更新方向
--[ ] 禁止 180° 掉头（可选）
+- [x] 接收 { type: "input", direction }
+- [x] 只更新方向
+- [x] 禁止 180° 掉头
 
 6. 状态广播
--[ ] 每个 tick 广播一次 gameState
--[ ] JSON 格式
--[ ] 所有客户端都收到
+- [x] 每个 tick 广播一次 gameState
+- [ ] JSON 格式
+- [x] 所有客户端都收到
 
 # Phase 3：最小前端（能看到动）
 7. Canvas 渲染
--[ ] 一个 <canvas>
--[ ] 画网格
--[ ] 画蛇头（一个方块就行）
+- [x] 一个 <canvas>
+- [x] 画网格
+- [x] 画蛇头（一个方块就行）
 
 8. 接收状态
--[ ] WebSocket 连接
--[ ] 接收 state
--[ ] 本地保存 latestState
--[ ] 每次收到就重绘
+- [x] WebSocket 连接
+- [x] 接收 state
+- [x] 本地保存 latestState
+- [ ] 每次收到就重绘
 
 9. 键盘输入
--[ ] 监听 ↑↓←→
--[ ] 发送 input 消息
+- [x] 监听 ↑↓←→
+- [x] 发送 input 消息
 
 # Phase 4：规则补全
 10. 食物
--[ ] 随机生成
--[ ] 吃到 → 蛇变长
--[ ] 食物重生
+- [x] 随机生成
+- [x] 吃到 → 蛇变长
+- [x] 食物重生
 
 11. 碰撞检测
--[ ] 撞墙死亡
--[ ] 撞自己
--[ ] 撞别人
+- [x] 撞墙死亡
+- [x] 撞自己
+- [x] 撞别人
 
 12. 玩家生命周期
--[ ] 死亡后消失
--[ ] 或 3 秒后重生（可选）
+- [x] 死亡后消失
+- [x] 或 5 秒后重生
 
 # Phase 5：工程加分（选做）
 -[ ] 前端插值平滑
@@ -82,3 +78,4 @@
 npm init -y
 npm install ws
 ```
+
