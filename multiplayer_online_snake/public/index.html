@@ -275,18 +275,22 @@
 
     // 多人模式 - 创建房间
     function createRoom() {
-      const wsUrl = `ws://${location.host}?mode=multi`;
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${protocol}://${location.host}?mode=multi`;
+      
+      console.log("尝试连接到:", wsUrl); 
       connectToServer(wsUrl);
     }
 
     // 多人模式 - 加入房间
     function joinRoom() {
       const roomId = document.getElementById('roomIdInput').value.trim();
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
       if (!roomId) {
         alert('请输入房间ID');
         return;
       }
-      const wsUrl = `ws://${location.host}?mode=multi&gameId=${roomId}`;
+      const wsUrl = `${protocol}://${location.host}?mode=multi&gameId=${roomId}`;
       connectToServer(wsUrl);
     }
 
@@ -496,3 +500,4 @@
   </script>
 </body>
 </html>
+
