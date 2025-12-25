@@ -240,7 +240,7 @@ function hideDeathModal() {
 function findSafeSpawnLocation(room) {
   // 初始蛇的形态（假设向右看，头在右，身在左）
   // 头需在 x >= 2 的位置，不然尾巴 (x-1, x-2) 会生成在墙外
-  const SAFE_PADDING = 2; 
+  const SAFE_PADDING = 6; 
   
   // 尝试 50 次，找不到就随便放（防止死循环）
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -296,7 +296,7 @@ function findSafeSpawnLocation(room) {
 
   // 5. 如果地图实在太挤了（试了50次都不行），只能随便给一个默认值
   // 这种情况下玩家可能会死，但没办法
-  return [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }];
+  return [{ x: 5, y: 10 }, { x: 4, y: 10 }, { x: 3, y: 10 }];
 }
 // === 发送复活请求 ===
 function requestRespawn() {
@@ -399,4 +399,5 @@ setInterval(gameLoop, TICK_RATE);
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
 
