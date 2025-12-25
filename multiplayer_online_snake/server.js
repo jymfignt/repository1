@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const TICK_RATE = 100;  //时间尺度 100ms一帧
 const GRID_SIZE = 20;  //空间尺度  20x20
 const url = require('url');
@@ -399,3 +399,4 @@ setInterval(gameLoop, TICK_RATE);
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
