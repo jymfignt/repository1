@@ -61,11 +61,13 @@
       color: #fff;
     }
     #roomInfo {
-      margin-top: 20px;
-      padding: 15px;
+      margin-bottom: 10px; /* 和画布保持距离 */
+      padding: 10px 20px;
       background: #222;
+      border: 1px solid #444;
       border-radius: 5px;
-      display: none;
+      display: none; /* 默认隐藏，JS控制显示 */
+      font-family: monospace; /* 等宽字体看起来像代码 */
     }
     canvas {
       background: #000;
@@ -93,13 +95,14 @@
         <input type="text" id="roomIdInput" placeholder="输入房间ID加入">
         <button onclick="joinRoom()">加入房间</button>
       </div>
-      <div id="roomInfo">
-        <p>房间ID: <span id="roomIdDisplay"></span></p>
-        <p>等待其他玩家加入...</p>
-      </div>
+      
     </div>
   </div>
   <div id="score">得分: <span id="scoreValue">0</span></div>
+  <div id="roomInfo">
+        <p>房间ID: <span id="roomIdDisplay"></span></p>
+        <p>等待其他玩家加入...</p>
+      </div>
   <canvas id="game" width="400" height="400"></canvas>
   <div id="deathModal" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; text-align: center; border-radius: 10px;">
     <h2>你挂了！</h2>
@@ -500,4 +503,5 @@
   </script>
 </body>
 </html>
+
 
